@@ -2,7 +2,6 @@
 resolver = "2"
 members = [
   "programs/*",
-  "services/*",
 ]
 
 [profile.release]
@@ -10,3 +9,11 @@ lto = "fat"
 codegen-units = 1
 overflow-checks = true
 
+[patch.crates-io]
+anchor-syn = { path = "vendor/anchor-syn" }
+blake3 = { path = "vendor/blake3" }
+base64ct = { path = "vendor/base64ct" }
+constant_time_eq = { path = "vendor/constant_time_eq" }
+toml_parser = { path = "vendor/toml_parser" }
+toml_edit = { path = "vendor/toml_edit" }
+toml_datetime = { path = "vendor/toml_datetime" }
