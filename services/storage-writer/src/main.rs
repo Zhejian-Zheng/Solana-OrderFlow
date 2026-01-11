@@ -66,7 +66,8 @@ async fn main() -> Result<()> {
         args.kafka_brokers, args.kafka_topic, args.kafka_group_id, args.database_url
     );
 
-    let mut shutdown = tokio::signal::ctrl_c();
+    let shutdown = tokio::signal::ctrl_c();
+    tokio::pin!(shutdown);
     let mut stream = consumer.stream();
 
     loop {

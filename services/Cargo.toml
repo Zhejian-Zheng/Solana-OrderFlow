@@ -1,0 +1,11 @@
+[workspace]
+resolver = "2"
+members = [
+  "common",
+  "listener",
+  "storage-writer",
+  "risk-engine",
+  "notifier",
+  "tx-client",
+]
+

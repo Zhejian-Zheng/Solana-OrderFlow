@@ -22,7 +22,7 @@ pub struct NormalizedEvent {
     pub ts_ingest_ms: u64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum EventType {
     OfferCreated,
     OfferFilled,

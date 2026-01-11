@@ -5,8 +5,7 @@ use orderflow_common::{now_ms, EventType, NormalizedEvent, OnchainLogEvent};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
 use solana_client::nonblocking::pubsub_client::PubsubClient;
-use solana_client::rpc_config::RpcTransactionLogsConfig;
-use solana_client::rpc_filter::RpcTransactionLogsFilter;
+use solana_client::rpc_config::{RpcTransactionLogsConfig, RpcTransactionLogsFilter};
 use solana_sdk::commitment_config::CommitmentConfig;
 
 #[derive(Debug, Parser)]
@@ -51,15 +50,20 @@ async fn main() -> Result<()> {
         _ => CommitmentConfig::finalized(),
     };
 
-    let (mut client, mut stream) = PubsubClient::logs_subscribe(
-        &args.solana_ws_url,
-        RpcTransactionLogsFilter::Mentions(vec![args.program_id.clone()]),
-        RpcTransactionLogsConfig {
-            commitment: Some(commitment),
-        },
-    )
-    .await
-    .context("logs_subscribe")?;
+    // Solana 1.18.x: logs_subscribe is an instance method on PubsubClient.
+    let client = PubsubClient::new(&args.solana_ws_url)
+        .await
+        .context("pubsub connect")?;
+
+    let (mut stream, _unsub) = client
+        .logs_subscribe(
+            RpcTransactionLogsFilter::Mentions(vec![args.program_id.clone()]),
+            RpcTransactionLogsConfig {
+                commitment: Some(commitment),
+            },
+        )
+        .await
+        .context("logs_subscribe")?;
 
     eprintln!(
         "listener started: program_id={} ws={} topic={} commitment={}",
@@ -67,7 +71,8 @@ async fn main() -> Result<()> {
     );
 
     // graceful shutdown on ctrl-c
-    let mut shutdown = tokio::signal::ctrl_c();
+    let shutdown = tokio::signal::ctrl_c();
+    tokio::pin!(shutdown);
 
     loop {
         tokio::select! {
@@ -140,7 +145,6 @@ async fn main() -> Result<()> {
         }
     }
 
-    let _ = client.shutdown().await;
     Ok(())
 }
 

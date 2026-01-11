@@ -67,7 +67,8 @@ async fn main() -> Result<()> {
 
     let mut cancels: HashMap<String, VecDeque<u64>> = HashMap::new();
     let mut emitted_alerts: HashSet<String> = HashSet::new(); // demo: in-mem de-dupe
-    let mut shutdown = tokio::signal::ctrl_c();
+    let shutdown = tokio::signal::ctrl_c();
+    tokio::pin!(shutdown);
     let mut stream = consumer.stream();
 
     let window_ms = args.cancel_window_min * 60_000;
