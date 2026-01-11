@@ -1,0 +1,16 @@
+[package]
+name = "storage-writer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0.95"
+clap = { version = "4.5.26", features = ["derive", "env"] }
+futures = "0.3.31"
+rdkafka = { version = "0.36.2", features = ["cmake-build"] }
+serde_json = "1.0.138"
+tokio = { version = "1.43.0", features = ["macros", "rt-multi-thread", "signal"] }
+tokio-postgres = "0.7.12"
+
+orderflow-common = { path = "../common" }
+
