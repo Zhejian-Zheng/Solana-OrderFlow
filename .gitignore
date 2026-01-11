@@ -1,0 +1,27 @@
+.DS_Store
+.idea
+.vscode
+
+# Rust
+target/
+**/target/
+Cargo.lock
+
+# Node
+node_modules/
+dist/
+.turbo/
+.next/
+
+# Anchor / Solana
+.anchor/
+test-ledger/
+.solana/
+
+# Env / runtime
+.env
+.env.*
+data/
+volumes/
+tmp/
+
