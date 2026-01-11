@@ -2,8 +2,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token::{self, CloseAccount, Mint, Token, TokenAccount, Transfer};
 
-// NOTE: 占位的有效 Pubkey（32-byte 全 0）。本地部署后用 `anchor keys list` 生成的 program id 替换它。
-declare_id!("11111111111111111111111111111111");
+declare_id!("FSZLWNceNe6DJRFkw2kvSTsSMjdTeBP2n2iaMfn3Uhxk");
 
 #[program]
 pub mod escrow {
@@ -56,12 +55,23 @@ pub mod escrow {
     }
 
     pub fn take_offer(ctx: Context<TakeOffer>) -> Result<()> {
-        let st = &mut ctx.accounts.escrow_state;
-        require!(st.status == EscrowStatus::Created as u8, EscrowError::InvalidStatus);
+        // read state immutably for CPI (avoid holding a mutable borrow across CPIs)
+        let maker = ctx.accounts.escrow_state.maker;
+        let offer_id = ctx.accounts.escrow_state.offer_id;
+        let escrow_bump = ctx.accounts.escrow_state.escrow_bump;
+        let mint_a = ctx.accounts.escrow_state.mint_a;
+        let mint_b = ctx.accounts.escrow_state.mint_b;
+        let amount_a = ctx.accounts.escrow_state.amount_a;
+        let amount_b = ctx.accounts.escrow_state.amount_b;
+
+        require!(
+            ctx.accounts.escrow_state.status == EscrowStatus::Created as u8,
+            EscrowError::InvalidStatus
+        );
 
         // basic mint sanity checks (also enforced by account constraints)
-        require_keys_eq!(ctx.accounts.mint_a.key(), st.mint_a, EscrowError::InvalidMint);
-        require_keys_eq!(ctx.accounts.mint_b.key(), st.mint_b, EscrowError::InvalidMint);
+        require_keys_eq!(ctx.accounts.mint_a.key(), mint_a, EscrowError::InvalidMint);
+        require_keys_eq!(ctx.accounts.mint_b.key(), mint_b, EscrowError::InvalidMint);
 
         // taker token B -> maker token B
         token::transfer(
@@ -73,15 +83,15 @@ pub mod escrow {
                     authority: ctx.accounts.taker.to_account_info(),
                 },
             ),
-            st.amount_b,
+            amount_b,
         )?;
 
         // vault token A -> taker token A (PDA signs via seeds/bump)
         let signer_seeds: &[&[u8]] = &[
             b"escrow",
-            st.maker.as_ref(),
-            &st.offer_id.to_le_bytes(),
-            &[st.escrow_bump],
+            maker.as_ref(),
+            &offer_id.to_le_bytes(),
+            &[escrow_bump],
         ];
 
         token::transfer(
@@ -94,22 +104,26 @@ pub mod escrow {
                 },
                 &[signer_seeds],
             ),
-            st.amount_a,
+            amount_a,
         )?;
 
-        st.status = EscrowStatus::Filled as u8;
-        st.taker = ctx.accounts.taker.key();
-        st.filled_slot = Clock::get()?.slot;
+        // mutate state after CPIs
+        {
+            let st = &mut ctx.accounts.escrow_state;
+            st.status = EscrowStatus::Filled as u8;
+            st.taker = ctx.accounts.taker.key();
+            st.filled_slot = Clock::get()?.slot;
+        }
 
         msg!(
             r#"{{"event":"OfferFilled","offer_id":"{}","maker":"{}","taker":"{}","mint_a":"{}","amount_a":{},"mint_b":"{}","amount_b":{} }}"#,
-            st.offer_id,
-            st.maker,
-            st.taker,
-            st.mint_a,
-            st.amount_a,
-            st.mint_b,
-            st.amount_b
+            offer_id,
+            maker,
+            ctx.accounts.taker.key(),
+            mint_a,
+            amount_a,
+            mint_b,
+            amount_b
         );
 
         // optional: close vault ATA to maker (saves rent)
@@ -127,15 +141,26 @@ pub mod escrow {
     }
 
     pub fn cancel_offer(ctx: Context<CancelOffer>) -> Result<()> {
-        let st = &mut ctx.accounts.escrow_state;
-        require!(st.status == EscrowStatus::Created as u8, EscrowError::InvalidStatus);
-        require_keys_eq!(ctx.accounts.maker.key(), st.maker, EscrowError::Unauthorized);
+        // read state immutably for CPI (avoid holding a mutable borrow across CPIs)
+        let maker = ctx.accounts.escrow_state.maker;
+        let offer_id = ctx.accounts.escrow_state.offer_id;
+        let escrow_bump = ctx.accounts.escrow_state.escrow_bump;
+        let mint_a = ctx.accounts.escrow_state.mint_a;
+        let mint_b = ctx.accounts.escrow_state.mint_b;
+        let amount_a = ctx.accounts.escrow_state.amount_a;
+        let amount_b = ctx.accounts.escrow_state.amount_b;
+
+        require!(
+            ctx.accounts.escrow_state.status == EscrowStatus::Created as u8,
+            EscrowError::InvalidStatus
+        );
+        require_keys_eq!(ctx.accounts.maker.key(), maker, EscrowError::Unauthorized);
 
         let signer_seeds: &[&[u8]] = &[
             b"escrow",
-            st.maker.as_ref(),
-            &st.offer_id.to_le_bytes(),
-            &[st.escrow_bump],
+            maker.as_ref(),
+            &offer_id.to_le_bytes(),
+            &[escrow_bump],
         ];
 
         // vault token A -> maker token A (PDA signs)
@@ -149,20 +174,24 @@ pub mod escrow {
                 },
                 &[signer_seeds],
             ),
-            st.amount_a,
+            amount_a,
         )?;
 
-        st.status = EscrowStatus::Cancelled as u8;
-        st.cancelled_slot = Clock::get()?.slot;
+        // mutate state after CPI
+        {
+            let st = &mut ctx.accounts.escrow_state;
+            st.status = EscrowStatus::Cancelled as u8;
+            st.cancelled_slot = Clock::get()?.slot;
+        }
 
         msg!(
             r#"{{"event":"OfferCancelled","offer_id":"{}","maker":"{}","mint_a":"{}","amount_a":{},"mint_b":"{}","amount_b":{} }}"#,
-            st.offer_id,
-            st.maker,
-            st.mint_a,
-            st.amount_a,
-            st.mint_b,
-            st.amount_b
+            offer_id,
+            maker,
+            mint_a,
+            amount_a,
+            mint_b,
+            amount_b
         );
 
         token::close_account(CpiContext::new_with_signer(

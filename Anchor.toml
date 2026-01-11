@@ -3,8 +3,7 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-# NOTE: 占位的有效 Pubkey（32-byte 全 0）。本地部署后用 `anchor keys list` 生成的 program id 替换它。
-escrow = "11111111111111111111111111111111"
+escrow = "FSZLWNceNe6DJRFkw2kvSTsSMjdTeBP2n2iaMfn3Uhxk"
 
 [registry]
 url = "https://api.apr.dev"
@@ -14,5 +13,5 @@ cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]
-test = "pnpm -s test"
+test = "npm test"
 
